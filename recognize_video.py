@@ -1,9 +1,10 @@
 # USAGE: python recognize_video.py
-
 from imutils.video import VideoStream
 from imutils.video import FPS
+from datetime import datetime
 from webcam import Webcam
 # import arduino_control
+from gtts import gTTS
 import numpy as np
 import imutils
 import pickle
@@ -26,24 +27,16 @@ print("[INFO] loading face recognizer...")
 embedder = cv2.dnn.readNetFromTorch(embedding_path)
 recognizer = pickle.loads(open(recognizer_path, "rb").read())
 le = pickle.loads(open(le_path, "rb").read())
-#
-# arduino = None
-# print("[INFO] Connecting arduino...")
-# try:
-# 	arduino = arduino_control.connect()
-# 	print(arduino)
-# except Exception:
-#     print("closing connection")
-#     if arduino:
-#         arduino_control.disconnect(arduino)
 
 print("[INFO] Smile yo, camera is starting...")
 webcam = Webcam()
 webcam.start()
 time.sleep(2.0)
 
-# start the FPS throughput estimator
+name_called_out = {}
+counts = {}
 fps = FPS().start()
+old_image = None
 
 while True:
 	frame = webcam.get_current_frame()
@@ -79,14 +72,33 @@ while True:
 			j = np.argmax(preds)
 			proba = preds[j]
 			name = le.classes_[j]
-
+			print(name)
 			# Launch ball when person is close to center of image
 			face_center = (startX + endX)/2
-			if abs(face_center - w/2) < w/4:
-				at_center = True
-			if name is 'Unknown' and at_center:
-				# arduino_control.rotate(arduino)
-				pass
+
+			old = counts.get(name, 0)
+			new = old + 1
+			counts[name] = new
+
+			if counts[name] >= 10 and name_called_out.get(name, False) is False:
+				if abs(face_center - w/2) < w/4:
+					at_center = True
+				if name == "unknown":
+					# arduino_control.rotate(arduino)
+					tts = gTTS(text="STOP, YOU SHALL NOT PASS.", lang='en')
+					tts.save("audio.mp3")
+					os.system('mpg321 audio.mp3 -quiet')
+					filename = datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss%f') + '.jpg'
+					cv2.imwrite('intruders/' + filename, old_image)
+				elif name != "unknown":
+					tts = gTTS(text="Hey" + name + "!", lang='en')
+					tts.save("audio.mp3")
+					filename = datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss%f') + '.jpg'
+					cv2.imwrite('cool_peeps/' + filename, old_image)
+					os.system('mpg321 audio.mp3 -quiet')
+					name_called_out[name] = True
+				counts = {}
+
 
 			# draw the bounding box of the face along with the associated probability
 			text = "{}: {:.2f}%".format(name, proba * 100)
@@ -100,6 +112,7 @@ while True:
 	fps.update()
 
 	cv2.imshow("Frame", frame)
+	old_image = frame
 	key = cv2.waitKey(1) & 0xFF
 	if key == ord("q"):
 		break
