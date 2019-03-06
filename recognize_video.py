@@ -6,6 +6,7 @@ from webcam import Webcam
 # import arduino_control
 from gtts import gTTS
 import numpy as np
+import subprocess
 import imutils
 import pickle
 import time
@@ -88,6 +89,7 @@ while True:
 					tts = gTTS(text="STOP, YOU SHALL NOT PASS.", lang='en')
 					tts.save("audio.mp3")
 					os.system('mpg321 audio.mp3 -quiet')
+					subprocess.call("""ssh pi@143.215.98.197 -t 'python ./Desktop/moveServo.py'""", shell=True)
 					filename = datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss%f') + '.jpg'
 					cv2.imwrite('intruders/' + filename, old_image)
 				elif name != "unknown":
